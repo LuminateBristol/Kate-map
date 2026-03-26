@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Map Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    #viewer {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #img-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+
+    .slide.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .slide img {
+      max-width: 100%;
+      max-height: 100%;
+      object-fit: contain;
+      display: block;
+      /* pinch-zoom support */
+      touch-action: pinch-zoom;
+    }
+
+    /* Left / Right tap zones */
+    #tap-left, #tap-right {
+      position: fixed;
+      top: 0;
+      height: 100%;
+      width: 40%;
+      z-index: 10;
+      cursor: pointer;
+    }
+    #tap-left  { left: 0; }
+    #tap-right { right: 0; }
+
+    /* Counter badge */
+    #counter {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-family: -apple-system, sans-serif;
+      font-size: 14px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      z-index: 20;
+      letter-spacing: 0.5px;
+      pointer-events: none;
+    }
+
+    /* Swipe hint arrows (fade out after first interaction) */
+    #hint {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      z-index: 15;
+      pointer-events: none;
+      transition: opacity 0.6s ease;
+    }
+    #hint span {
+      font-size: 36px;
+      color: rgba(255,255,255,0.45);
+      text-shadow: 0 0 8px rgba(0,0,0,0.6);
+    }
+    #hint.hidden { opacity: 0; }
+  </style>
+</head>
+<body>
+
+<div id="viewer">
+  <div id="img-container"></div>
+</div>
+
+<div id="tap-left"  aria-label="Previous image"></div>
+<div id="tap-right" aria-label="Next image"></div>
+
+<div id="hint">
+  <span>&#8249;</span>
+  <span>&#8250;</span>
+</div>
+
+<div id="counter"></div>
+
+<script>
+  const TOTAL = 10;
+  let current = 0;
+  let hintDismissed = false;
+
+  // Build slides
+  const container = document.getElementById('img-container');
+  const slides = [];
+
+  for (let i = 1; i <= TOTAL; i++) {
+    const div = document.createElement('div');
+    div.className = 'slide' + (i === 1 ? ' active' : '');
+    const img = document.createElement('img');
+    img.src = `${i}.png`;
+    img.alt = `Map ${i}`;
+    img.draggable = false;
+    div.appendChild(img);
+    container.appendChild(div);
+    slides.push(div);
+  }
+
+  const counter = document.getElementById('counter');
+  const hint    = document.getElementById('hint');
+
+  function updateCounter() {
+    counter.textContent = `${current + 1} / ${TOTAL}`;
+  }
+
+  function showSlide(index) {
+    slides[current].classList.remove('active');
+    current = (index + TOTAL) % TOTAL;
+    slides[current].classList.add('active');
+    updateCounter();
+  }
+
+  function dismissHint() {
+    if (!hintDismissed) {
+      hintDismissed = true;
+      hint.classList.add('hidden');
+    }
+  }
+
+  document.getElementById('tap-left').addEventListener('click', () => {
+    dismissHint();
+    showSlide(current - 1);
+  });
+
+  document.getElementById('tap-right').addEventListener('click', () => {
+    dismissHint();
+    showSlide(current + 1);
+  });
+
+  // Swipe gesture support
+  let touchStartX = null;
+
+  document.addEventListener('touchstart', e => {
+    touchStartX = e.changedTouches[0].clientX;
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    touchStartX = null;
+    if (Math.abs(dx) < 40) return; // too small — might be a tap
+    dismissHint();
+    if (dx < 0) showSlide(current + 1); // swipe left → next
+    else         showSlide(current - 1); // swipe right → prev
+  }, { passive: true });
+
+  // Keyboard support (desktop testing)
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') showSlide(current + 1);
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   showSlide(current - 1);
+  });
+
+  updateCounter();
+</script>
+</body>
+</html>
